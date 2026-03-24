@@ -46,4 +46,4 @@ npm run dev
 The UI serves at `http://localhost:3000/`.
 
 ## 📌 Repository
-Managed by [Antigravity AI](https://github.com/google-deepmind) as a unique project for **Janak27-del**.
+Built and managed by **Janak Kandel**.
