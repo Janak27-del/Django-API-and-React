@@ -16,7 +16,8 @@ import {
   Circle,
   CheckCircle2,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Hash
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -25,7 +26,8 @@ const API_BASE = 'http://localhost:8000/api/tasks/';
 export default function App() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'kanban'
+  const [viewMode, setViewMode] = useState('list'); 
+  const [activeTab, setActiveTab] = useState('core'); // 'core', 'nodes', 'pulse'
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [formData, setFormData] = useState({ 
@@ -38,9 +40,17 @@ export default function App() {
     try {
       const { data } = await axios.get(API_BASE);
       setTasks(data);
-    } catch (err) { console.error('Aether Synapse Error:', err); }
+    } catch (err) { console.error('Synapse Failure:', err); }
     finally { setLoading(false); }
   };
+
+  const getFilteredTasks = () => {
+    if (activeTab === 'pulse') return tasks.filter(t => t.is_starred || t.priority === 'high');
+    // For 'nodes', maybe we just show them grouped, but for now just show all for list/kanban
+    return tasks;
+  };
+
+  const filteredTasks = getFilteredTasks();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -71,7 +81,7 @@ export default function App() {
     try {
       await axios.patch(`${API_BASE}${task.id}/`, { is_starred: !task.is_starred });
       fetchTasks();
-    } catch (err) { console.error('Star Fail:', err); }
+    } catch (err) { console.error('Star Failure:', err); }
   };
 
   const handleDelete = async (id) => {
@@ -79,11 +89,11 @@ export default function App() {
     try {
       await axios.delete(`${API_BASE}${id}/`);
       fetchTasks();
-    } catch (err) { console.error('Deletion Fail:', err); }
+    } catch (err) { console.error('Deletion Failure:', err); }
   };
 
   const KanbanColumn = ({ status, label }) => {
-    const colTasks = tasks.filter(t => t.status === status);
+    const colTasks = filteredTasks.filter(t => t.status === status);
     return (
       <div className="kanban-col">
         <div className="col-header">
@@ -93,15 +103,14 @@ export default function App() {
         {colTasks.map(task => (
           <div key={task.id} className="kanban-card">
             <div className="kb-head">
-              <span className="kb-tag">{task.category}</span>
+              <span className="kb-tag">#{task.category}</span>
               <button className={`star-btn ${task.is_starred ? 'active' : ''}`} onClick={() => handleToggleStar(task)}>
                 <Star size={14} fill={task.is_starred ? 'currentColor' : 'none'} />
               </button>
             </div>
             <h4>{task.title}</h4>
-            <p>{task.description}</p>
             <div className="kb-meta">
-              <div className={`priority-dot ${task.priority}`} />
+              <div className={`priority-dot ${task.priority}`} title={task.priority} />
               <div className="task-actions">
                 <button onClick={() => openEdit(task)}><Edit3 size={14} /></button>
                 <button onClick={() => handleDelete(task.id)}><Trash2 size={14} /></button>
@@ -115,16 +124,22 @@ export default function App() {
 
   return (
     <div className="layout">
-      {/* Sidebar */}
+      {/* Sidebar - Now Functional */}
       <aside className="sidebar">
-        <div className="brand">
+        <div className="brand" onClick={() => setActiveTab('core')} style={{ cursor: 'pointer' }}>
           <div className="logo-box">A</div>
           <span>Aether AI</span>
         </div>
         <nav>
-          <div className="nav-item active"><Brain size={18} /> <span>Neural Core</span></div>
-          <div className="nav-item"><Layers size={18} /> <span>Nodes</span></div>
-          <div className="nav-item"><Activity size={18} /> <span>Pulse</span></div>
+          <div className={`nav-item ${activeTab === 'core' ? 'active' : ''}`} onClick={() => setActiveTab('core')}>
+            <Brain size={18} /> <span>Neural Core</span>
+          </div>
+          <div className={`nav-item ${activeTab === 'nodes' ? 'active' : ''}`} onClick={() => setActiveTab('nodes')}>
+            <Layers size={18} /> <span>Nodes</span>
+          </div>
+          <div className={`nav-item ${activeTab === 'pulse' ? 'active' : ''}`} onClick={() => setActiveTab('pulse')}>
+            <Activity size={18} /> <span>Pulse</span>
+          </div>
         </nav>
       </aside>
 
@@ -133,7 +148,7 @@ export default function App() {
         <header className="header">
           <div className="search-bar">
             <Search size={16} />
-            <input type="text" placeholder="Access synaptic memory..." />
+            <input type="text" placeholder="Access neural memory..." />
           </div>
           <div className="header-actions">
             <div className="toggle-group" style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: '12px', padding: '4px', border: '1px solid var(--border)' }}>
@@ -145,58 +160,78 @@ export default function App() {
               </button>
             </div>
             <button className="add-btn" onClick={() => setShowModal(true)}>
-              <PlusCircle size={18} /> Link Signal
+              <PlusCircle size={18} /> New Signal
             </button>
           </div>
         </header>
 
         <section className="content">
-          <div className="stats">
-            <div className="stat-card"><h3>Neural Synapses</h3><p>{tasks.length}</p></div>
-            <div className="stat-card"><h3>Priority Stars</h3><p>{tasks.filter(t => t.is_starred).length}</p></div>
-            <div className="stat-card"><h3>Processing</h3><p>{tasks.filter(t => t.status === 'in_progress').length}</p></div>
-            <div className="stat-card"><h3>Synced</h3><p>{tasks.filter(t => t.status === 'completed').length}</p></div>
-          </div>
-
-          <div className="view-container">
-            {loading ? <div className="loader">Synchronizing Aether...</div> : (
-              viewMode === 'list' ? (
-                <div className="signals-list">
-                  <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
-                    <h2>Neural Stream</h2>
-                    <span style={{ fontSize: '0.9rem', color: 'var(--text-dim)' }}>{tasks.length} active threads</span>
+          {activeTab === 'nodes' ? (
+            <div className="nodes-view">
+              <h1 style={{ marginBottom: '32px' }}>Category Nodes</h1>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
+                {Array.from(new Set(tasks.map(t => t.category))).map(cat => (
+                  <div key={cat} className="stat-card glass" style={{ borderLeft: '4px solid var(--primary)' }}>
+                    <h3>Node</h3>
+                    <p style={{ fontSize: '1.5rem' }}>{cat}</p>
+                    <div style={{ marginTop: '12px', color: 'var(--text-dim)', fontSize: '0.8rem' }}>{tasks.filter(t => t.category === cat).length} Signals Active</div>
                   </div>
-                  {tasks.map(task => (
-                    <div key={task.id} className="signal-card">
-                      <div className="signal-main">
-                        <button className={`star-btn ${task.is_starred ? 'active' : ''}`} onClick={() => handleToggleStar(task)}>
-                          <Star size={18} fill={task.is_starred ? 'currentColor' : 'none'} />
-                        </button>
-                        <div className="signal-content">
-                          <span className="kb-tag" style={{ fontSize: '0.7rem', display: 'block', marginBottom: '2px' }}>{task.category}</span>
-                          <h4 className={task.status === 'completed' ? 'strike' : ''}>{task.title}</h4>
-                        </div>
-                      </div>
-                      <div className="signal-meta">
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>{task.status}</span>
-                        <div className={`priority-dot ${task.priority}`} />
-                        <div className="task-actions">
-                          <button onClick={() => openEdit(task)}><Edit3 size={16} /></button>
-                          <button onClick={() => handleDelete(task.id)}><Trash2 size={16} /></button>
-                        </div>
-                      </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="welcome-msg">
+                <h1>{activeTab === 'pulse' ? 'Synaptic Pulse (High Sensitivity)' : 'Neural Interface'}</h1>
+                <p>Status: {loading ? 'Calibrating...' : 'Synchronized'}</p>
+              </div>
+
+              <div className="stats">
+                <div className="stat-card"><h3>Neural Synapses</h3><p>{tasks.length}</p></div>
+                <div className="stat-card"><h3>Starred Signals</h3><p>{tasks.filter(t => t.is_starred).length}</p></div>
+                <div className="stat-card"><h3>Active Load</h3><p>{tasks.filter(t => t.status === 'in_progress').length}</p></div>
+                <div className="stat-card"><h3>Signal Type</h3><p>{activeTab === 'pulse' ? 'Urgent' : 'General'}</p></div>
+              </div>
+
+              <div className="view-container">
+                {loading ? <div className="loader">Processing Aether...</div> : (
+                  viewMode === 'list' ? (
+                    <div className="signals-list">
+                      {filteredTasks.length === 0 ? <p style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>No matching synaptic signals found.</p> : 
+                        filteredTasks.map(task => (
+                          <div key={task.id} className="signal-card">
+                            <div className="signal-main">
+                              <button className={`star-btn ${task.is_starred ? 'active' : ''}`} onClick={() => handleToggleStar(task)}>
+                                <Star size={18} fill={task.is_starred ? 'currentColor' : 'none'} />
+                              </button>
+                              <div className="signal-content">
+                                <span className="kb-tag" style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 700 }}>#{task.category}</span>
+                                <h4 className={task.status === 'completed' ? 'strike' : ''}>{task.title}</h4>
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>{task.description}</p>
+                              </div>
+                            </div>
+                            <div className="signal-meta">
+                              <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{task.status}</span>
+                              <div className={`priority-dot ${task.priority}`} />
+                              <div className="task-actions">
+                                <button onClick={() => openEdit(task)}><Edit3 size={16} /></button>
+                                <button onClick={() => handleDelete(task.id)}><Trash2 size={16} /></button>
+                              </div>
+                            </div>
+                          </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="kanban-board">
-                  <KanbanColumn status="todo" label="Neural Queue" />
-                  <KanbanColumn status="in_progress" label="Processing" />
-                  <KanbanColumn status="completed" label="Synced Data" />
-                </div>
-              )
-            )}
-          </div>
+                  ) : (
+                    <div className="kanban-board">
+                      <KanbanColumn status="todo" label="Neural Queue" />
+                      <KanbanColumn status="in_progress" label="Processing" />
+                      <KanbanColumn status="completed" label="Synced Data" />
+                    </div>
+                  )
+                )}
+              </div>
+            </>
+          )}
         </section>
       </main>
 
@@ -212,15 +247,15 @@ export default function App() {
               </div>
               <div className="form-group">
                 <label>Node Category</label>
-                <input value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} placeholder="e.g. Logical, Structural" />
+                <input value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} placeholder="e.g. Cognitive, Structural" />
               </div>
               <div className="form-group">
-                <label>Context Array</label>
+                <label>Context Array (Description)</label>
                 <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} rows="3" />
               </div>
               <div className="row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="form-group">
-                  <label>Synapse Priority</label>
+                  <label>Criticality</label>
                   <select value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}>
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
@@ -228,7 +263,7 @@ export default function App() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Current Phase</label>
+                  <label>Synaptic Phase</label>
                   <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
                     <option value="todo">Pending</option>
                     <option value="in_progress">Active</option>
