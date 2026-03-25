@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-const API_BASE = 'http://localhost:8000/api/tasks/';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/tasks/';
 
 export default function App() {
   const [tasks, setTasks] = useState([]);
